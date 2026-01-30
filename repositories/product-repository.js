@@ -1,49 +1,62 @@
+const {Pool} = require('pg');
+
+
 class ProductRepository {
 
     constructor() {
-        this.productos = [
-            { id: 1, nombre: 'Producto A', precio: 100, stock: 10, sku: 'A001' },
-            { id: 2, nombre: 'Producto B', precio: 200, stock: 5, sku: 'B002' },
-            { id: 3, nombre: 'Producto C', precio: 300, stock: 8, sku: 'C003' },
-            { id: 4, nombre: 'Producto D', precio: 150, stock: 20, sku: 'D004' },
-            { id: 5, nombre: 'Producto E', precio: 250, stock: 15, sku: 'E005' },
-            { id: 6, nombre: 'Producto F', precio: 350, stock: 12, sku: 'F006' },
-        ];
+        this.pool = new Pool({
+            user: 'postgres',
+            host: 'localhost',
+            database: 'products_db',
+            password: 'postgres',
+            port: 5437,
+        });
     }
 
-    findAll() {
-        return this.productos;
+    async findAll() {
+        const res = await this.pool.query('SELECT * FROM products');
+        return res.rows;
     }
 
-    findById(id) {
-        return this.productos.find(producto => producto.id === id);
+    async findById(id) {
+        const res = await this.pool.query('SELECT * FROM products WHERE id = $1', [id]);
+        return res.rows[0];
     }
 
-    create(producto) {
-        const newProducto = {
-            id: this.productos.length + 1,
-            ...producto
-        };
-        this.productos.push(newProducto);
-        return newProducto;
+    async findBySku(sku) {
+        const res = await this.pool.query('SELECT * FROM products WHERE sku = $1', [sku]);
+        return res.rows[0];
     }
 
-    update(id, productoActualizado) {
-        const index = this.productos.findIndex(producto => producto.id === id);
-        if (index !== -1) {
-            this.productos[index] = { id, ...productoActualizado };
-            return this.productos[index];
-        }
-        return null;
+    async findProductBetweenExistence(minExistence, maxExistence){
+        const res = await this.pool.query('SELECT * FROM products WHERE stock BETWEEN $1 AND $2',[minExistence,maxExistence]);
+        return res.rows
     }
 
-    deleteById(id) {
-        const index = this.productos.findIndex(producto => producto.id === id);
-        if (index !== -1) {
-            const deletedProducto = this.productos.splice(index, 1);
-            return deletedProducto[0];
-        }
-        return null;
+    async create(producto) {
+        const { name, description, price, stock, sku } = producto;
+        const res = await this.pool.query(
+            'INSERT INTO products (name, description, price, stock, sku) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+            [name, description, price, stock, sku]
+        );
+        return res.rows[0];
+    }
+
+    async update(id, productoActualizado) {
+        const { name, description, price, stock, sku } = productoActualizado;
+        const res = await this.pool.query(
+            'UPDATE products SET name = $1, description = $2, price = $3, stock = $4, sku = $5 WHERE id = $6 RETURNING *',
+            [name, description, price, stock, sku, id]
+        );
+        return res.rows[0];
+    }
+
+    async deleteById(id) {
+        const res = await this.pool.query(
+            'DELETE FROM products WHERE id = $1 RETURNING *',
+            [id]
+        );
+        return res.rows[0];
     }
 }
 
